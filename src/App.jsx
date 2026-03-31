@@ -18,7 +18,7 @@ const DEFAULT_CATEGORIES = [
   { id: "other", name: "기타", icon: "📦", color: "#6B7280" },
 ];
 
-function formatMoney(n) { return n.toLocaleString("ko-KR") + "원"; }
+function formatMoney(n) { return (Number(n) || 0).toLocaleString("ko-KR") + "원"; }
 function formatDate(d) { return `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`; }
 
 function getCycleRange(baseDate, payDay) {
@@ -207,12 +207,13 @@ export default function App() {
   // Use larger of settings income or recorded income
   const effectiveIncome = Math.max(settingsIncome, totalIncome);
 
-  // Fixed payments - total expected per cycle
+  // Fixed payments - total expected per cycle (compatible with old data)
+  const getFixedAmount = (fp) => Number(fp.amount) || (Number(fp.principal || 0) + Number(fp.interest || 0)) || 0;
   const activeFixed = (data.fixedPayments || []).filter(fp => {
-    const endD = new Date(fp.endDate);
+    const endD = new Date(fp.endDate || "2099-12-31");
     return endD >= cycle.start;
   });
-  const fixedMonthlyTotal = activeFixed.reduce((s,fp) => s + fp.amount, 0);
+  const fixedMonthlyTotal = activeFixed.reduce((s,fp) => s + getFixedAmount(fp), 0);
 
   // Which fixed payments are already paid this cycle?
   const paidFixedIds = cycleTransactions.filter(t => t.fixedPaymentId).map(t => t.fixedPaymentId);
@@ -227,7 +228,7 @@ export default function App() {
     .sort((a,b) => a.nextDate - b.nextDate);
 
   // Unpaid fixed total
-  const unpaidFixedTotal = upcomingPayments.reduce((s,fp) => s + fp.amount, 0);
+  const unpaidFixedTotal = upcomingPayments.reduce((s,fp) => s + getFixedAmount(fp), 0);
 
   // Available balance = income - expenses - unpaid fixed payments
   const availableBalance = effectiveIncome - totalExpense - unpaidFixedTotal;
@@ -255,7 +256,7 @@ export default function App() {
   }
 
   function completePayment(fp) {
-    const amt = Number(payAmount) || fp.amount;
+    const amt = Number(payAmount) || getFixedAmount(fp);
     const tx = { id: Date.now().toString(), amount: amt, category: "fixed", memo: `${fp.name} 납부`, date: new Date().toISOString().slice(0,10), type: "expense", fixedPaymentId: fp.id };
     setData(d => ({ ...d, transactions: [...d.transactions, tx] }));
     setShowPayConfirm(null); setPayAmount("");
@@ -293,7 +294,7 @@ export default function App() {
   }
 
   function editFixed(fp) {
-    setFixedForm({ name:fp.name, amount:String(fp.amount), payDay:String(fp.payDay), endDate:fp.endDate, memo:fp.memo||"" });
+    setFixedForm({ name:fp.name, amount:String(getFixedAmount(fp)), payDay:String(fp.payDay), endDate:fp.endDate, memo:fp.memo||"" });
     setEditingFixedId(fp.id); setShowAddFixed(true);
   }
 
@@ -354,12 +355,12 @@ export default function App() {
   const vOther = Number(vIncomeSettings.other || 0);
   const vEffectiveIncome = Math.max(vSalary + vOther, vTotalIncome);
   const vPaidFixedIds = vTransactions.filter(t => t.fixedPaymentId).map(t => t.fixedPaymentId);
-  const vActiveFixed = (data.fixedPayments || []).filter(fp => new Date(fp.endDate) >= vCycle.start);
+  const vActiveFixed = (data.fixedPayments || []).filter(fp => new Date(fp.endDate || "2099-12-31") >= vCycle.start);
   const vUpcoming = vActiveFixed.filter(fp => !vPaidFixedIds.includes(fp.id)).map(fp => {
     const next = getNextPaymentDate(fp.payDay, vCycle.start, vCycle.end);
     return { ...fp, nextDate: next, daysLeft: daysBetween(today, next) };
   }).sort((a,b) => a.nextDate - b.nextDate);
-  const vUnpaidTotal = vUpcoming.reduce((s,fp) => s + fp.amount, 0);
+  const vUnpaidTotal = vUpcoming.reduce((s,fp) => s + getFixedAmount(fp), 0);
   const vAvailable = vEffectiveIncome - vTotalExpense - vUnpaidTotal;
   const vByCategory = categories.map(cat => {
     const sum = vExpenses.filter(t => t.category === cat.id).reduce((s,t) => s + t.amount, 0);
@@ -458,8 +459,8 @@ export default function App() {
                       {fp.memo && <div style={{fontSize:13,color:"#64748b",marginTop:2}}>{fp.memo}</div>}
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <span style={{fontSize:16,fontWeight:700,color:"#818CF8",fontFamily:"'Space Mono',monospace"}}>{formatMoney(fp.amount)}</span>
-                      <button onClick={()=>{setShowPayConfirm(fp);setPayAmount(String(fp.amount));}}
+                      <span style={{fontSize:16,fontWeight:700,color:"#818CF8",fontFamily:"'Space Mono',monospace"}}>{formatMoney(getFixedAmount(fp))}</span>
+                      <button onClick={()=>{setShowPayConfirm(fp);setPayAmount(String(getFixedAmount(fp)));}}
                         style={{padding:"8px 14px",borderRadius:10,border:"none",background:"#10B98130",color:"#10B981",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Noto Sans KR',sans-serif"}}>
                         납부완료
                       </button>
@@ -683,7 +684,7 @@ export default function App() {
                           </div>
                         </div>
                         <div style={{display:"flex",alignItems:"center",gap:6}}>
-                          <span style={{fontSize:16,fontWeight:700,color:"#818CF8",fontFamily:"'Space Mono',monospace"}}>{formatMoney(fp.amount)}</span>
+                          <span style={{fontSize:16,fontWeight:700,color:"#818CF8",fontFamily:"'Space Mono',monospace"}}>{formatMoney(getFixedAmount(fp))}</span>
                           <button onClick={()=>editFixed(fp)} style={{...S.deleteBtn,color:"#818CF8",fontSize:14}}>✎</button>
                           <button onClick={()=>deleteFixed(fp.id)} style={{...S.deleteBtn,color:"#F43F5E"}}>✕</button>
                         </div>
