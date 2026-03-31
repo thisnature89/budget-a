@@ -139,6 +139,7 @@ export default function App() {
   const [incomeForm, setIncomeForm] = useState({ salary:"", other:"" });
   const [payDayInput, setPayDayInput] = useState("");
   const [showPayDayEdit, setShowPayDayEdit] = useState(false);
+  const [cycleOffset, setCycleOffset] = useState(0);
 
   // Auth
   useEffect(() => { const u = onAuthStateChanged(auth, u => { setUser(u); setAuthChecked(true); }); return u; }, []);
@@ -335,7 +336,6 @@ export default function App() {
   }
 
   // Navigate cycle
-  const [cycleOffset, setCycleOffset] = useState(0);
   const viewDate = new Date(today.getFullYear(), today.getMonth() + cycleOffset, today.getDate());
 
   function prevCycle() { setCycleOffset(o => o - 1); }
